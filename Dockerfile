@@ -1,7 +1,5 @@
 FROM golang:1.23-alpine AS build
 
-ENV GOTOOLCHAIN=local
-
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download

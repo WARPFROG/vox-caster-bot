@@ -1,6 +1,6 @@
 module vox-caster-bot
 
-go 1.25.0
+go 1.23
 
 require (
 	github.com/mmcdole/gofeed v1.3.0
