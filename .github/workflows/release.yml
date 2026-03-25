@@ -20,10 +20,15 @@ jobs:
       - name: Build binary
         run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o vox-caster-bot-linux-amd64 ./cmd/vox-caster-bot
 
+      - name: Generate checksums
+        run: sha256sum vox-caster-bot-linux-amd64 > SHA256SUMS
+
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: vox-caster-bot-linux-amd64
+          files: |
+            vox-caster-bot-linux-amd64
+            SHA256SUMS
 
       - uses: docker/login-action@v3
         with:
