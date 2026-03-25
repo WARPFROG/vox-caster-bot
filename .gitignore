@@ -1,0 +1,17 @@
+# Binary
+rss-bot
+vox-caster-bot*
+
+# macOS
+.DS_Store
+
+# State
+state.json
+
+# Config with secrets
+config.yaml
+
+# IDE
+.idea/
+.vscode/
+*.swp

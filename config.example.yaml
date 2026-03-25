@@ -1,0 +1,14 @@
+telegram_token: "YOUR_BOT_TOKEN"
+channel_id: "@yourchannel"
+poll_interval: "5m"
+state_path: "state.json"
+state_max_age: "720h"  # 30 days; items older than this are forgotten and may be re-sent
+wiki_api: "https://wiki.example.com/api.php"
+insecure_skip_verify: false
+
+feeds:
+  - url: "https://wiki.example.com/index.php?title=Special:NewPages&feed=rss"
+    type: "new_page"
+    # template: "optional Go template, see README"
+  - url: "https://wiki.example.com/api.php?action=feedrecentchanges&feedformat=rss"
+    type: "update"

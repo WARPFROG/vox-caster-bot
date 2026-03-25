@@ -1,0 +1,13 @@
+services:
+  rss-bot:
+    build: .
+    restart: unless-stopped
+    environment:
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+    volumes:
+      - ./config.yaml:/config/config.yaml:ro
+      - bot-data:/data
+    command: ["/config/config.yaml"]
+
+volumes:
+  bot-data:
