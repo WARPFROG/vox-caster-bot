@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"rss-bot/internal/config"
-	"rss-bot/internal/feed"
-	"rss-bot/internal/telegram"
+	"vox-caster-bot/internal/config"
+	"vox-caster-bot/internal/feed"
+	"vox-caster-bot/internal/telegram"
 )
 
 // --- Mock fetcher ---

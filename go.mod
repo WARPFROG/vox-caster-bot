@@ -1,4 +1,4 @@
-module rss-bot
+module vox-caster-bot
 
 go 1.25.0
 

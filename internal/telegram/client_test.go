@@ -8,8 +8,8 @@ import (
 	"testing"
 	"text/template"
 
-	"rss-bot/internal/config"
-	"rss-bot/internal/feed"
+	"vox-caster-bot/internal/config"
+	"vox-caster-bot/internal/feed"
 )
 
 func TestSend_MessageOnly(t *testing.T) {

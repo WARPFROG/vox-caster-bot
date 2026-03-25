@@ -20,8 +20,8 @@ Telegram bot that polls MediaWiki RSS feeds and forwards new or updated pages to
 cp config.example.yaml config.yaml
 # Edit config.yaml with your Telegram bot token, channel, and feed URLs
 
-go build ./cmd/rss-bot
-./rss-bot
+go build ./cmd/vox-caster-bot
+./vox-caster-bot
 ```
 
 ### Docker
@@ -70,7 +70,7 @@ feeds:
 ## CLI Flags
 
 ```
-./rss-bot [flags]
+./vox-caster-bot [flags]
   -config string   path to config file (default "config.yaml")
   -once            poll once and exit
 ```
@@ -112,7 +112,7 @@ Messages use Telegram's [HTML parse mode](https://core.telegram.org/bots/api#htm
 ## Architecture
 
 ```
-cmd/rss-bot/         Entrypoint, signal handling, dependency wiring
+cmd/vox-caster-bot/         Entrypoint, signal handling, dependency wiring
 internal/
   config/            YAML config loading and validation
   feed/              RSS/Atom fetching via gofeed
@@ -146,7 +146,7 @@ internal/
 ```bash
 go test ./...                                    # all tests
 go test ./internal/bot -run TestPoll_NewItems -v # single test
-go build ./cmd/rss-bot                           # build binary
+go build ./cmd/vox-caster-bot                           # build binary
 ```
 
 All major components use interfaces — tests use mocks with no network calls required.

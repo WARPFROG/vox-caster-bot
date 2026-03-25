@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Run
 
 ```bash
-go build ./cmd/rss-bot            # build binary
+go build ./cmd/vox-caster-bot     # build binary
 go test ./...                      # run all tests
 go test ./internal/bot -run TestPoll_NewItems -v  # run a single test
 ```
@@ -20,10 +20,10 @@ TELEGRAM_TOKEN=xxx docker compose up --build
 Telegram bot that polls MediaWiki RSS feeds and forwards new/updated pages to a Telegram channel with cover images. Single-binary Go app with a polling loop.
 
 **Packages:**
-- `cmd/rss-bot` — entrypoint, signal handling, dependency wiring
+- `cmd/vox-caster-bot` — entrypoint, signal handling, dependency wiring
 - `internal/config` — YAML config loading, `TELEGRAM_TOKEN` env var override. Feeds are typed (`new_page` or `update`) for different message templates
 - `internal/feed` — RSS/Atom fetching via `gofeed` library with custom HTTP client (for TLS skip). Extracts `dc:creator` as Author
-- `internal/state` — JSON file-backed store of seen item GUIDs per feed. Capped at 500 per feed
+- `internal/state` — JSON file-backed store of seen item GUIDs per feed with time-based expiry
 - `internal/wiki` — MediaWiki API client. Fetches page cover images via `pageimages` prop. URL helpers extract page title and direct URL from diff links
 - `internal/telegram` — Telegram Bot API via direct HTTP. Sends photos (`sendPhoto`) with text fallback (`sendMessage`). Separate format templates for new pages vs updates
 - `internal/bot` — orchestrator: poll feeds → check state → fetch wiki image → format message → send to Telegram

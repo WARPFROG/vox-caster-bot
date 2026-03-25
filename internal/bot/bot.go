@@ -5,11 +5,11 @@ import (
 	"log"
 	"time"
 
-	"rss-bot/internal/config"
-	"rss-bot/internal/feed"
-	"rss-bot/internal/state"
-	"rss-bot/internal/telegram"
-	"rss-bot/internal/wiki"
+	"vox-caster-bot/internal/config"
+	"vox-caster-bot/internal/feed"
+	"vox-caster-bot/internal/state"
+	"vox-caster-bot/internal/telegram"
+	"vox-caster-bot/internal/wiki"
 )
 
 // Bot polls RSS feeds and sends new items to Telegram.

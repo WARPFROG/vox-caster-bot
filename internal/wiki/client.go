@@ -47,7 +47,7 @@ func (c *httpClient) FetchPageImage(ctx context.Context, pageTitle string) (stri
 		return "", fmt.Errorf("create request: %w", err)
 	}
 
-	req.Header.Set("User-Agent", "rss-bot/1.0 (https://github.com/rss-bot)")
+	req.Header.Set("User-Agent", "vox-caster-bot/1.0 (https://github.com/atkrv/vox-caster-bot)")
 
 	resp, err := c.http.Do(req)
 	if err != nil {

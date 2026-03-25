@@ -1,5 +1,5 @@
 services:
-  rss-bot:
+  vox-caster-bot:
     build: .
     restart: unless-stopped
     environment:

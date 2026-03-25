@@ -14,8 +14,8 @@ import (
 	"text/template"
 	"time"
 
-	"rss-bot/internal/config"
-	"rss-bot/internal/feed"
+	"vox-caster-bot/internal/config"
+	"vox-caster-bot/internal/feed"
 )
 
 const defaultAPIBase = "https://api.telegram.org"

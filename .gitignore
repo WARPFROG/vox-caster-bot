@@ -1,6 +1,6 @@
 # Binary
-rss-bot
-vox-caster-bot*
+/vox-caster-bot
+/vox-caster-bot-*
 
 # macOS
 .DS_Store
