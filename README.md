@@ -39,7 +39,7 @@ TELEGRAM_TOKEN=your_token docker compose up -d
 Pull the image manually:
 
 ```bash
-docker pull ghcr.io/atkrv/vox-caster-bot:latest
+docker pull ghcr.io/warpfrog/vox-caster-bot:latest
 ```
 
 ## Configuration

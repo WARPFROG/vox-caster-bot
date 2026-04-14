@@ -1,6 +1,6 @@
 services:
   vox-caster-bot:
-    image: ghcr.io/atkrv/vox-caster-bot:latest
+    image: ghcr.io/warpfrog/vox-caster-bot:latest
     container_name: vox-caster-bot
     restart: unless-stopped
     working_dir: /data
