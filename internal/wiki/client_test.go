@@ -31,7 +31,7 @@ func TestFetchPageImage_Found(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient(srv.URL, &http.Client{})
+	c := NewClient(srv.URL, &http.Client{}, 0)
 	img, err := c.FetchPageImage(context.Background(), "Test_Page")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -58,7 +58,7 @@ func TestFetchPageImage_NotFound(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient(srv.URL, &http.Client{})
+	c := NewClient(srv.URL, &http.Client{}, 0)
 	img, err := c.FetchPageImage(context.Background(), "Nonexistent")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -84,7 +84,7 @@ func TestFetchPageImage_NoImage(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient(srv.URL, &http.Client{})
+	c := NewClient(srv.URL, &http.Client{}, 0)
 	img, err := c.FetchPageImage(context.Background(), "No_Image_Page")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

@@ -38,3 +38,4 @@ Telegram bot that polls MediaWiki RSS feeds and forwards new/updated pages to a 
 - On send failure, processing stops for that feed and retries next poll. State saved after each successful send (at-least-once delivery)
 - `insecure_skip_verify` config option for wikis with self-signed certificates
 - `proxy_url` config option routes Telegram traffic through a proxy (SOCKS5 or HTTP); wiki/feed traffic always goes direct
+- `fetch_timeout` (default 300s) and `request_timeout` (default 120s) configurable in YAML; passed into `NewHTTPFetcher` and `wiki.NewClient` respectively

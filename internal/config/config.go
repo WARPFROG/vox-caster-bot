@@ -55,6 +55,8 @@ type Config struct {
 	WikiAPI            string        `yaml:"-"`
 	InsecureSkipVerify bool          `yaml:"-"`
 	ProxyURL           string        `yaml:"-"`
+	FetchTimeout       time.Duration `yaml:"-"`
+	RequestTimeout     time.Duration `yaml:"-"`
 }
 
 type rawConfig struct {
@@ -67,6 +69,8 @@ type rawConfig struct {
 	WikiAPI            string       `yaml:"wiki_api"`
 	InsecureSkipVerify bool         `yaml:"insecure_skip_verify"`
 	ProxyURL           string       `yaml:"proxy_url"`
+	FetchTimeout       string       `yaml:"fetch_timeout"`
+	RequestTimeout     string       `yaml:"request_timeout"`
 }
 
 func Load(path string) (*Config, error) {
@@ -132,6 +136,22 @@ func Load(path string) (*Config, error) {
 		}
 	}
 
+	fetchTimeout := 300 * time.Second
+	if raw.FetchTimeout != "" {
+		fetchTimeout, err = time.ParseDuration(raw.FetchTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("parse fetch_timeout: %w", err)
+		}
+	}
+
+	requestTimeout := 120 * time.Second
+	if raw.RequestTimeout != "" {
+		requestTimeout, err = time.ParseDuration(raw.RequestTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("parse request_timeout: %w", err)
+		}
+	}
+
 	return &Config{
 		TelegramToken:      raw.TelegramToken,
 		ChannelID:          raw.ChannelID,
@@ -142,5 +162,7 @@ func Load(path string) (*Config, error) {
 		WikiAPI:            raw.WikiAPI,
 		InsecureSkipVerify: raw.InsecureSkipVerify,
 		ProxyURL:           raw.ProxyURL,
+		FetchTimeout:       fetchTimeout,
+		RequestTimeout:     requestTimeout,
 	}, nil
 }

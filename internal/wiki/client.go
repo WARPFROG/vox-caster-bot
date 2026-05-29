@@ -19,16 +19,18 @@ type Client interface {
 type httpClient struct {
 	apiBase string
 	http    *http.Client
+	timeout time.Duration
 }
 
-const requestTimeout = 15 * time.Second
-
-func NewClient(apiBase string, client *http.Client) Client {
-	return &httpClient{apiBase: apiBase, http: client}
+func NewClient(apiBase string, client *http.Client, timeout time.Duration) Client {
+	if timeout <= 0 {
+		timeout = 120 * time.Second
+	}
+	return &httpClient{apiBase: apiBase, http: client, timeout: timeout}
 }
 
 func (c *httpClient) FetchPageImage(ctx context.Context, pageTitle string) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
 	params := url.Values{
@@ -68,7 +70,7 @@ func (c *httpClient) FetchPageImage(ctx context.Context, pageTitle string) (stri
 }
 
 func (c *httpClient) DownloadImage(ctx context.Context, imageURL string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, imageURL, nil)

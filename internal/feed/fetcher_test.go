@@ -50,7 +50,7 @@ func TestFetch_RSS(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	f := NewHTTPFetcher(&http.Client{})
+	f := NewHTTPFetcher(&http.Client{}, 0)
 	items, err := f.Fetch(context.Background(), srv.URL)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -93,7 +93,7 @@ func TestFetch_Atom(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	f := NewHTTPFetcher(&http.Client{})
+	f := NewHTTPFetcher(&http.Client{}, 0)
 	items, err := f.Fetch(context.Background(), srv.URL)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -120,7 +120,7 @@ func TestFetch_ServerError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	f := NewHTTPFetcher(&http.Client{})
+	f := NewHTTPFetcher(&http.Client{}, 0)
 	_, err := f.Fetch(context.Background(), srv.URL)
 	if err == nil {
 		t.Fatal("expected error for server error")
@@ -133,7 +133,7 @@ func TestFetch_InvalidXML(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	f := NewHTTPFetcher(&http.Client{})
+	f := NewHTTPFetcher(&http.Client{}, 0)
 	_, err := f.Fetch(context.Background(), srv.URL)
 	if err == nil {
 		t.Fatal("expected error for invalid XML")

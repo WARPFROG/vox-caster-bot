@@ -28,18 +28,20 @@ type Fetcher interface {
 
 // HTTPFetcher fetches feeds over HTTP.
 type HTTPFetcher struct {
-	parser *gofeed.Parser
-	client *http.Client
+	parser  *gofeed.Parser
+	client  *http.Client
+	timeout time.Duration
 }
 
-const fetchTimeout = 30 * time.Second
-
-func NewHTTPFetcher(client *http.Client) *HTTPFetcher {
-	return &HTTPFetcher{parser: gofeed.NewParser(), client: client}
+func NewHTTPFetcher(client *http.Client, timeout time.Duration) *HTTPFetcher {
+	if timeout <= 0 {
+		timeout = 300 * time.Second
+	}
+	return &HTTPFetcher{parser: gofeed.NewParser(), client: client, timeout: timeout}
 }
 
 func (f *HTTPFetcher) Fetch(ctx context.Context, feedURL string) ([]Item, error) {
-	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
+	ctx, cancel := context.WithTimeout(ctx, f.timeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, feedURL, nil)

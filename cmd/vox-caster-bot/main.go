@@ -50,13 +50,13 @@ func main() {
 		Feeds:     cfg.Feeds,
 		ChannelID: cfg.ChannelID,
 		Interval:  cfg.PollInterval,
-		Fetcher:   feed.NewHTTPFetcher(wikiClient),
+		Fetcher:   feed.NewHTTPFetcher(wikiClient, cfg.FetchTimeout),
 		State:     store,
 		Telegram:  telegram.NewClient(cfg.TelegramToken, telegramClient),
 	}
 
 	if cfg.WikiAPI != "" {
-		b.Wiki = wiki.NewClient(cfg.WikiAPI, wikiClient)
+		b.Wiki = wiki.NewClient(cfg.WikiAPI, wikiClient, cfg.RequestTimeout)
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
