@@ -6,11 +6,14 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"golang.org/x/net/proxy"
 	"vox-caster-bot/internal/bot"
 	"vox-caster-bot/internal/config"
 	"vox-caster-bot/internal/feed"
@@ -29,9 +32,13 @@ func main() {
 		log.Fatalf("load config: %v", err)
 	}
 
-	httpClient, err := buildHTTPClient(cfg.InsecureSkipVerify, cfg.ProxyURL)
+	wikiClient, err := buildHTTPClient(cfg.InsecureSkipVerify, "")
 	if err != nil {
-		log.Fatalf("build http client: %v", err)
+		log.Fatalf("build wiki http client: %v", err)
+	}
+	telegramClient, err := buildHTTPClient(cfg.InsecureSkipVerify, cfg.ProxyURL)
+	if err != nil {
+		log.Fatalf("build telegram http client: %v", err)
 	}
 
 	store, err := state.NewFileStore(cfg.StatePath, cfg.StateMaxAge)
@@ -43,13 +50,13 @@ func main() {
 		Feeds:     cfg.Feeds,
 		ChannelID: cfg.ChannelID,
 		Interval:  cfg.PollInterval,
-		Fetcher:   feed.NewHTTPFetcher(httpClient),
+		Fetcher:   feed.NewHTTPFetcher(wikiClient),
 		State:     store,
-		Telegram:  telegram.NewClient(cfg.TelegramToken, httpClient),
+		Telegram:  telegram.NewClient(cfg.TelegramToken, telegramClient),
 	}
 
 	if cfg.WikiAPI != "" {
-		b.Wiki = wiki.NewClient(cfg.WikiAPI, httpClient)
+		b.Wiki = wiki.NewClient(cfg.WikiAPI, wikiClient)
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -67,13 +74,29 @@ func main() {
 
 func buildHTTPClient(insecureSkipVerify bool, proxyURL string) (*http.Client, error) {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSHandshakeTimeout = 30 * time.Second
 
 	if proxyURL != "" {
 		u, err := url.Parse(proxyURL)
 		if err != nil {
 			return nil, fmt.Errorf("parse proxy_url: %w", err)
 		}
-		transport.Proxy = http.ProxyURL(u)
+		switch u.Scheme {
+		case "socks5", "socks5h":
+			dialer, err := proxy.FromURL(u, proxy.Direct)
+			if err != nil {
+				return nil, fmt.Errorf("create socks5 dialer: %w", err)
+			}
+			if cd, ok := dialer.(proxy.ContextDialer); ok {
+				transport.DialContext = cd.DialContext
+			} else {
+				transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+					return dialer.Dial(network, addr)
+				}
+			}
+		default:
+			transport.Proxy = http.ProxyURL(u)
+		}
 	}
 
 	if insecureSkipVerify {

@@ -20,7 +20,7 @@ TELEGRAM_TOKEN=xxx docker compose up -d
 Telegram bot that polls MediaWiki RSS feeds and forwards new/updated pages to a Telegram channel with cover images. Single-binary Go app with a polling loop.
 
 **Packages:**
-- `cmd/vox-caster-bot` — entrypoint, signal handling, dependency wiring. Builds a shared `http.Client` with proxy/TLS settings and passes it to all clients
+- `cmd/vox-caster-bot` — entrypoint, signal handling, dependency wiring. Builds two `http.Client`s: `wikiClient` (no proxy, for wiki API and feeds) and `telegramClient` (with SOCKS5 proxy from `proxy_url`, for Telegram API)
 - `internal/config` — YAML config loading, `TELEGRAM_TOKEN` env var override. Feeds are typed (`new_page` or `update`) for different message templates
 - `internal/feed` — RSS/Atom fetching via `gofeed` library. Extracts `dc:creator` as Author
 - `internal/state` — JSON file-backed store of seen item GUIDs per feed with time-based expiry
@@ -37,4 +37,4 @@ Telegram bot that polls MediaWiki RSS feeds and forwards new/updated pages to a 
 - Items sent oldest-first (feeds reversed) to preserve chronological order
 - On send failure, processing stops for that feed and retries next poll. State saved after each successful send (at-least-once delivery)
 - `insecure_skip_verify` config option for wikis with self-signed certificates
-- `proxy_url` config option routes all outbound traffic through a proxy; falls back to `HTTP_PROXY`/`HTTPS_PROXY` env vars
+- `proxy_url` config option routes Telegram traffic through a proxy (SOCKS5 or HTTP); wiki/feed traffic always goes direct
