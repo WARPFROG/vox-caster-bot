@@ -107,7 +107,7 @@ func feedURL() string { return "https://example.com/feed" }
 
 func TestPoll_NewItems(t *testing.T) {
 	items := []feed.Item{
-		{GUID: "1", Title: "First", Link: "https://wiki.example.com/index.php?title=First&diff=1&oldid=0"},
+		{GUID: "1", Title: "First", Link: "https://wiki.example.com/index.php?title=First&diff=4&oldid=3"},
 		{GUID: "2", Title: "Second", Link: "https://wiki.example.com/index.php?title=Second&diff=2&oldid=1"},
 	}
 
@@ -212,7 +212,7 @@ func TestPoll_FetchError_ContinuesNextFeed(t *testing.T) {
 		ChannelID: "@test",
 		Fetcher: &selectiveFetcher{
 			good: map[string][]feed.Item{
-				goodURL: {{GUID: "1", Title: "Good", Link: "https://good.com/1"}},
+				goodURL: {{GUID: "1", Title: "Good", Link: "https://good.com/index.php?title=Good&diff=2&oldid=1"}},
 			},
 			bad: map[string]error{
 				badURL: errors.New("connection refused"),
@@ -231,8 +231,8 @@ func TestPoll_FetchError_ContinuesNextFeed(t *testing.T) {
 
 func TestPoll_SendError_StopsProcessingFeed(t *testing.T) {
 	items := []feed.Item{
-		{GUID: "1", Title: "First", Link: "https://example.com/1"},
-		{GUID: "2", Title: "Second", Link: "https://example.com/2"},
+		{GUID: "1", Title: "First", Link: "https://example.com/index.php?title=First&diff=2&oldid=1"},
+		{GUID: "2", Title: "Second", Link: "https://example.com/index.php?title=Second&diff=4&oldid=3"},
 	}
 
 	st := newMockState()
@@ -284,6 +284,67 @@ func TestPoll_UsesCorrectTemplate(t *testing.T) {
 	}
 }
 
+func TestPoll_UpdateFeed_SkipsNonEdits(t *testing.T) {
+	items := []feed.Item{
+		{GUID: "edit", Title: "Edited", Link: "https://wiki.example.com/index.php?title=Edited&diff=10&oldid=9"},
+		{GUID: "new", Title: "Created", Link: "https://wiki.example.com/index.php?title=Created&diff=11&oldid=0"},
+		{GUID: "log", Title: "Logged", Link: "https://wiki.example.com/index.php?title=Logged"},
+	}
+
+	st := newMockState()
+	st.feeds[feedURL()] = map[string]bool{}
+
+	tg := &mockTelegram{}
+
+	b := &Bot{
+		Feeds:     []config.FeedConfig{{URL: feedURL(), Type: config.FeedUpdate}},
+		ChannelID: "@test",
+		Fetcher:   &mockFetcher{items: map[string][]feed.Item{feedURL(): items}},
+		State:     st,
+		Telegram:  tg,
+	}
+
+	b.Poll(context.Background())
+
+	if len(tg.sent) != 1 {
+		t.Fatalf("sent %d items, want 1 (only the real edit)", len(tg.sent))
+	}
+	if !containsStr(tg.sent[0].Text, "Edited") {
+		t.Errorf("expected the edit item to be sent, got:\n%s", tg.sent[0].Text)
+	}
+	if st.IsNew(feedURL(), "new") {
+		t.Error("creation item should be marked seen without sending")
+	}
+	if st.IsNew(feedURL(), "log") {
+		t.Error("log item should be marked seen without sending")
+	}
+}
+
+func TestPoll_NewPageFeed_NotFiltered(t *testing.T) {
+	// new_page feed links have no diff/oldid params — they must not be
+	// mistaken for non-edits and dropped.
+	st := newMockState()
+	st.feeds[feedURL()] = map[string]bool{}
+
+	tg := &mockTelegram{}
+
+	b := &Bot{
+		Feeds:     []config.FeedConfig{{URL: feedURL(), Type: config.FeedNewPage}},
+		ChannelID: "@test",
+		Fetcher: &mockFetcher{items: map[string][]feed.Item{
+			feedURL(): {{GUID: "1", Title: "Created", Link: "https://wiki.example.com/index.php?title=Created"}},
+		}},
+		State:    st,
+		Telegram: tg,
+	}
+
+	b.Poll(context.Background())
+
+	if len(tg.sent) != 1 {
+		t.Fatalf("sent %d items, want 1", len(tg.sent))
+	}
+}
+
 func TestPoll_WikiError_StillSends(t *testing.T) {
 	st := newMockState()
 	st.feeds[feedURL()] = map[string]bool{}
@@ -294,7 +355,7 @@ func TestPoll_WikiError_StillSends(t *testing.T) {
 		Feeds:     []config.FeedConfig{{URL: feedURL(), Type: config.FeedUpdate}},
 		ChannelID: "@test",
 		Fetcher: &mockFetcher{items: map[string][]feed.Item{
-			feedURL(): {{GUID: "1", Title: "Page", Link: "https://wiki.example.com/index.php?title=Page&diff=1&oldid=0"}},
+			feedURL(): {{GUID: "1", Title: "Page", Link: "https://wiki.example.com/index.php?title=Page&diff=43&oldid=42"}},
 		}},
 		State:    st,
 		Telegram: tg,

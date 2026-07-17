@@ -77,6 +77,20 @@ func (b *Bot) processFeed(ctx context.Context, fc config.FeedConfig) error {
 			continue
 		}
 
+		// feedrecentchanges ignores hidenewpages/hidelog (those are
+		// Special:RecentChanges web-UI params), so the update feed also
+		// carries page creations and log entries. Drop everything that is
+		// not an edit to an existing page — creations are already covered
+		// by the new_page feed.
+		if fc.Type == config.FeedUpdate && !wiki.IsEditURL(item.Link) {
+			log.Printf("update feed: skipping non-edit item %q (%s)", item.Title, item.Link)
+			b.State.MarkSeen(fc.URL, item.GUID)
+			if err := b.State.Save(); err != nil {
+				log.Printf("error saving state: %v", err)
+			}
+			continue
+		}
+
 		msg := b.buildMessage(ctx, fc, item)
 
 		if err := b.Telegram.Send(ctx, b.ChannelID, msg); err != nil {

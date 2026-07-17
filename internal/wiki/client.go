@@ -116,6 +116,18 @@ func PageTitleFromURL(rawURL string) string {
 	return u.Query().Get("title")
 }
 
+// IsEditURL reports whether rawURL is a diff link for an edit to an existing
+// page: it has a diff param and a non-zero oldid. In recent-changes feeds,
+// page creations carry oldid=0 and log entries have no diff param at all.
+func IsEditURL(rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	q := u.Query()
+	return q.Get("diff") != "" && q.Get("oldid") != "" && q.Get("oldid") != "0"
+}
+
 // DirectPageURL returns the canonical page URL by stripping diff/oldid params.
 func DirectPageURL(rawURL string) string {
 	u, err := url.Parse(rawURL)

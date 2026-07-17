@@ -22,7 +22,7 @@ feeds:
       {{- end}}
 
       🏷 #wiki #new
-  - url: "https://wiki.example.com/api.php?action=feedrecentchanges&feedformat=rss"
+  - url: "https://wiki.example.com/api.php?action=feedrecentchanges&feedformat=rss&hidebots=1&hideminor=1&limit=50"
     type: "update"
     template: |-
       📝 My Wiki — updated
