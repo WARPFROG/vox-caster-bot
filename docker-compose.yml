@@ -1,11 +1,19 @@
 services:
   vox-caster-bot:
-    image: ghcr.io/warpfrog/vox-caster-bot:latest
+    # BOT_TAG is pinned in .env by the release deploy (e.g. BOT_TAG=1.4.3)
+    image: ghcr.io/warpfrog/vox-caster-bot:${BOT_TAG:-latest}
     container_name: vox-caster-bot
     restart: unless-stopped
+    # host networking so the bot can reach the SOCKS5 proxy on 127.0.0.1
+    network_mode: host
     working_dir: /data
     environment:
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     volumes:
       - ./config.yaml:/config/config.yaml:ro
       - ./:/data

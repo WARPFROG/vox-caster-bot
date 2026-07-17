@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"vox-caster-bot/internal/config"
@@ -317,6 +318,43 @@ func TestPoll_UpdateFeed_SkipsNonEdits(t *testing.T) {
 	}
 	if st.IsNew(feedURL(), "log") {
 		t.Error("log item should be marked seen without sending")
+	}
+}
+
+func TestPoll_CapsSendsPerPoll(t *testing.T) {
+	var items []feed.Item
+	for i := 0; i < 15; i++ {
+		items = append(items, feed.Item{
+			GUID:  fmt.Sprintf("g%d", i),
+			Title: fmt.Sprintf("Page %d", i),
+			Link:  fmt.Sprintf("https://wiki.example.com/index.php?title=Page_%d", i),
+		})
+	}
+
+	st := newMockState()
+	st.feeds[feedURL()] = map[string]bool{}
+
+	tg := &mockTelegram{}
+
+	b := &Bot{
+		Feeds:     []config.FeedConfig{{URL: feedURL(), Type: config.FeedNewPage}},
+		ChannelID: "@test",
+		Fetcher:   &mockFetcher{items: map[string][]feed.Item{feedURL(): items}},
+		State:     st,
+		Telegram:  tg,
+	}
+
+	b.Poll(context.Background())
+
+	if len(tg.sent) != maxSendsPerPoll {
+		t.Fatalf("sent %d items, want %d (per-poll cap)", len(tg.sent), maxSendsPerPoll)
+	}
+	// Oldest-first: the reversed tail (g14..g5) goes out, g4..g0 wait
+	if !st.IsNew(feedURL(), "g4") {
+		t.Error("item beyond the cap should stay unseen for the next cycle")
+	}
+	if st.IsNew(feedURL(), "g5") {
+		t.Error("last item within the cap should be marked seen")
 	}
 }
 
