@@ -9,6 +9,11 @@ services:
     working_dir: /data
     environment:
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     volumes:
       - ./config.yaml:/config/config.yaml:ro
       - ./:/data
