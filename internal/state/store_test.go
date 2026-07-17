@@ -53,6 +53,33 @@ func TestHasFeed(t *testing.T) {
 	}
 }
 
+func TestHasFeed_AllExpired_TreatedAsUnknown(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "state.json")
+
+	s1, err := NewFileStore(path, 24*time.Hour)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	s1.MarkSeen("feed1", "only-item")
+	s1.(*fileStore).data.Feeds["feed1"].Seen[0].SeenAt = time.Now().Add(-48 * time.Hour)
+
+	if err := s1.Save(); err != nil {
+		t.Fatalf("save error: %v", err)
+	}
+
+	// After reload the sole item is purged; the feed must look unknown so the
+	// bot re-seeds it silently instead of posting the entire feed backlog.
+	s2, err := NewFileStore(path, 24*time.Hour)
+	if err != nil {
+		t.Fatalf("load error: %v", err)
+	}
+
+	if s2.HasFeed("feed1") {
+		t.Error("feed with only expired items should be treated as unknown")
+	}
+}
+
 func TestSaveLoad_Roundtrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "state.json")
 

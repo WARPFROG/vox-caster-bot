@@ -67,12 +67,19 @@ jobs:
         with:
           context: .
           push: true
+          # plain manifest: the prod host runs Docker 19.03, which chokes on
+          # provenance/SBOM attestation manifests
+          provenance: false
+          sbom: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
   deploy:
     needs: release
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     env:
       DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
       DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
@@ -109,9 +116,21 @@ jobs:
 
       - name: Pull image and restart
         if: steps.gate.outputs.configured == 'true'
+        # Pins the exact release version by writing BOT_TAG into the host's
+        # .env (compose reads image: ...:${BOT_TAG}); a tag ref deploys that
+        # version, a branch dispatch deploys latest. The ghcr package is
+        # private: log in on the host with the run's ephemeral GITHUB_TOKEN
+        # (fed via stdin, dies with the run) and log out right after. The
+        # host may only have the standalone docker-compose binary, not the
+        # docker compose plugin — detect which.
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ssh -i ~/.ssh/deploy_key -p "${DEPLOY_PORT:-22}" "$DEPLOY_USER@$DEPLOY_HOST" \
-            "cd ${DEPLOY_PATH:-/opt/vox-caster-bot} && docker compose pull -q && docker compose up -d"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then BOT_TAG="${GITHUB_REF_NAME#v}"; else BOT_TAG="latest"; fi
+          echo "deploying image tag: $BOT_TAG"
+          printf '%s' "$GHCR_TOKEN" | ssh -i ~/.ssh/deploy_key -p "${DEPLOY_PORT:-22}" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "docker login ghcr.io -u '$GHCR_USER' --password-stdin && cd ${DEPLOY_PATH:-/opt/vox-caster-bot} && { grep -v '^BOT_TAG=' .env 2>/dev/null; echo 'BOT_TAG=$BOT_TAG'; } > .env.new && mv .env.new .env && if docker compose version >/dev/null 2>&1; then C='docker compose'; else C='docker-compose'; fi && \$C pull -q && \$C up -d; rc=\$?; docker logout ghcr.io >/dev/null 2>&1; exit \$rc"
 
       - name: Smoke check
         if: steps.gate.outputs.configured == 'true'

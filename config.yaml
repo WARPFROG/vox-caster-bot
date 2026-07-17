@@ -1,9 +1,12 @@
 # telegram_token is intentionally not stored here: the bot reads it from the
 # TELEGRAM_TOKEN env var (kept in .env next to docker-compose.yml on the host).
-channel_id: "@orkyhut"
+channel_id: "@warpfrog_radio"
 poll_interval: "5m"
 state_path: "state.json"
 wiki_api: "https://wiki.warpfrog.wtf/api.php"
+# Telegram API is reached through a SOCKS5 proxy local to the VPS; the
+# container runs with network_mode: host so 127.0.0.1 is the host itself.
+proxy_url: "socks5://127.0.0.1:1081"
 
 feeds:
   - url: "https://wiki.warpfrog.wtf/index.php?title=Special:NewPages&feed=rss"
@@ -27,7 +30,7 @@ feeds:
   - url: "https://wiki.warpfrog.wtf/api.php?action=feedrecentchanges&feedformat=rss&namespace=0&hidebots=1&hideminor=1&hideanons=1&days=7&limit=50"
     type: "update"
     template: |-
-      📣 <b>Warpopedia</b> — обновление перевода
+      📢 <b>Warpopedia</b> — обновление перевода
 
       {{if .PageURL}}<b><a href="{{.PageURL}}">{{html .Title}}</a></b>
       {{- else}}<b>{{html .Title}}</b>

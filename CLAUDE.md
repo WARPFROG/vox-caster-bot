@@ -16,7 +16,7 @@ CLI flags: `-config <path>` (default `config.yaml`), `-once`, `-validate`.
 
 **CI/CD** (GitHub Actions, Go from `go-version: stable`):
 - `ci.yml` (PR + main): tests, golangci-lint (`.golangci.yml`), govulncheck, config validation via `-validate`, Docker build check on PRs
-- `release.yml` (`v*` tags) is the only path to prod: tests → linux/amd64 binary + GitHub release with generated notes → `ghcr.io/warpfrog/vox-caster-bot` image (semver + `latest`) → SSH deploy to the VPS (scp `docker-compose.yml`+`config.yaml`, `docker compose pull && up -d`, smoke check). Deploy is skipped until `DEPLOY_HOST`/`DEPLOY_USER`/`DEPLOY_SSH_KEY` (+ optional `DEPLOY_PORT`, `DEPLOY_PATH`, default `/opt/vox-caster-bot`) repo secrets are set. Roll back by re-running the workflow on an old tag: `gh workflow run release.yml --ref vX.Y.Z`
+- `release.yml` (`v*` tags) is the only path to prod: tests → linux/amd64 binary + GitHub release with generated notes → `ghcr.io/warpfrog/vox-caster-bot` image (semver + `latest`) → SSH deploy to the VPS (scp `docker-compose.yml`+`config.yaml`, `docker compose pull && up -d`, smoke check). Deploy is skipped until `DEPLOY_HOST`/`DEPLOY_USER`/`DEPLOY_SSH_KEY` (+ optional `DEPLOY_PORT`, `DEPLOY_PATH`, default `/opt/vox-caster-bot`) repo secrets are set. The ghcr package is private — the deploy job logs the host into ghcr with the run's ephemeral `GITHUB_TOKEN` and logs out after pulling. The deployed version is pinned: the deploy writes `BOT_TAG=X.Y.Z` into the host's `.env` and compose uses `image: ...:${BOT_TAG:-latest}`. Roll back by re-running the workflow on an old tag: `gh workflow run release.yml --ref vX.Y.Z`
 
 **Docker:**
 ```bash
@@ -45,7 +45,8 @@ Telegram bot that polls MediaWiki RSS feeds and forwards new/updated pages to a 
 - `config.yaml` is committed and contains no secrets: the token comes only from the `TELEGRAM_TOKEN` env var (`.env` on the host). Deploys ship `config.yaml` to the VPS, so feed/template changes go live with the next release
 - Cover images fetched from MediaWiki `pageimages` API; page title extracted from RSS link's `?title=` param. The bot downloads the image bytes and uploads them multipart, so Telegram never needs direct access to the wiki
 - `sendPhoto` with automatic fallback to `sendMessage` if photo delivery fails
-- First run for a feed marks all existing items as seen without sending (prevents spam on startup)
+- First run for a feed marks all existing items as seen without sending (prevents spam on startup). A feed whose remembered items have all expired counts as first-run again — `state.HasFeed` requires a non-empty seen set, otherwise a stale state key would flood the channel with the feed's whole backlog
+- At most `maxSendsPerPoll` (10) items are posted per feed per cycle; a longer backlog drains over subsequent cycles instead of hitting Telegram rate limits
 - Items sent oldest-first (feeds reversed) to preserve chronological order
 - On send failure, processing stops for that feed and retries next poll. State saved after each successful send (at-least-once delivery)
 - `insecure_skip_verify` config option for wikis with self-signed certificates
