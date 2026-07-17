@@ -8,7 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 go build ./cmd/vox-caster-bot     # build binary
 go test ./...                      # run all tests
 go test ./internal/bot -run TestPoll_NewItems -v  # run a single test
+go run ./cmd/vox-caster-bot -once  # single poll cycle, then exit (useful for manual testing)
 ```
+
+CLI flags: `-config <path>` (default `config.yaml`), `-once`. CI runs `go test ./...` on Go 1.23; there is no linter.
 
 **Docker:**
 ```bash
@@ -21,17 +24,20 @@ Telegram bot that polls MediaWiki RSS feeds and forwards new/updated pages to a 
 
 **Packages:**
 - `cmd/vox-caster-bot` — entrypoint, signal handling, dependency wiring. Builds two `http.Client`s: `wikiClient` (no proxy, for wiki API and feeds) and `telegramClient` (with SOCKS5 proxy from `proxy_url`, for Telegram API)
-- `internal/config` — YAML config loading, `TELEGRAM_TOKEN` env var override. Feeds are typed (`new_page` or `update`) for different message templates
-- `internal/feed` — RSS/Atom fetching via `gofeed` library. Extracts `dc:creator` as Author
+- `internal/config` — YAML config loading, `TELEGRAM_TOKEN` env var override. Feeds are typed (`new_page` or `update`); an optional per-feed Go `text/template` is compiled at load time into `FeedConfig.Compiled` with funcs from `config.TemplateFuncs`
+- `internal/feed` — RSS/Atom fetching via `gofeed` library. Author resolved from `author` → `authors[0]` → `dc:creator`; GUID falls back to link, then title
 - `internal/state` — JSON file-backed store of seen item GUIDs per feed with time-based expiry
 - `internal/wiki` — MediaWiki API client. Fetches page cover images via `pageimages` prop. URL helpers extract page title and direct URL from diff links
-- `internal/telegram` — Telegram Bot API via direct HTTP. Sends photos (`sendPhoto`) with text fallback (`sendMessage`). Separate format templates for new pages vs updates
+- `internal/telegram` — Telegram Bot API via direct HTTP. Sends photos (`sendPhoto`) with text fallback (`sendMessage`). All message formatting lives here: built-in new-page/update templates and custom template rendering (`FormatMessage` / `MessageData`)
 - `internal/bot` — orchestrator: poll feeds → check state → fetch wiki image → format message → send to Telegram
 
 **Key design decisions:**
-- Interfaces (`Fetcher`, `Store`, `Client`, `wiki.Client`) used throughout — bot tests use mocks, no network needed
-- Two feed types with different templates: `new_page` (title + author + link) and `update` (title + author + edit summary + page link + diff link)
-- Cover images fetched from MediaWiki `pageimages` API; page title extracted from RSS link's `?title=` param
+- Interfaces (`Fetcher`, `Store`, `Client`, `wiki.Client`) used throughout — bot tests use mocks; feed/telegram/wiki tests use `httptest` servers (`telegram.NewClientWithBase` points the client at a test URL). No real network needed
+- Feed type selects the built-in message template; both render linked title + author and differ only in header. For `update` feeds the RSS item link is a diff link — `wiki.DirectPageURL` strips `diff`/`oldid` params to recover the canonical page URL
+- `update` feeds only post edits to existing pages (`wiki.IsEditURL`: `diff` param + non-zero `oldid`); other items are marked seen without sending. Needed because MediaWiki's `feedrecentchanges` API ignores `hidenewpages`/`hidelog` (those are Special:RecentChanges web-UI params), so page creations arrive in the feed and would be double-posted alongside the `new_page` feed
+- Per-feed custom templates (`feeds[].template`, Go `text/template`) receive `telegram.MessageData` (`.Title`, `.Author`, `.Content`, `.Link`, `.PageURL`, `.FeedTitle`, `.Published`); funcs: `html` (escape), `striphtml`. Execution errors fall back to the built-in template. To expose a new field, thread it through `feed.Item` → `MessageData` → `FormatMessage`
+- All messages sent with `parse_mode=HTML` — user-derived text must be HTML-escaped
+- Cover images fetched from MediaWiki `pageimages` API; page title extracted from RSS link's `?title=` param. The bot downloads the image bytes and uploads them multipart, so Telegram never needs direct access to the wiki
 - `sendPhoto` with automatic fallback to `sendMessage` if photo delivery fails
 - First run for a feed marks all existing items as seen without sending (prevents spam on startup)
 - Items sent oldest-first (feeds reversed) to preserve chronological order
