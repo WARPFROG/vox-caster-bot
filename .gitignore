@@ -8,8 +8,8 @@
 # State
 state.json
 
-# Config with secrets
-config.yaml
+# Secrets
+.env
 
 # IDE
 .idea/

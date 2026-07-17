@@ -25,11 +25,16 @@ import (
 func main() {
 	configPath := flag.String("config", "config.yaml", "path to config file")
 	once := flag.Bool("once", false, "poll once and exit instead of running the loop")
+	validateOnly := flag.Bool("validate", false, "validate config and exit")
 	flag.Parse()
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
 		log.Fatalf("load config: %v", err)
+	}
+	if *validateOnly {
+		fmt.Printf("config %s: OK (%d feeds)\n", *configPath, len(cfg.Feeds))
+		return
 	}
 
 	wikiClient, err := buildHTTPClient(cfg.InsecureSkipVerify, "")

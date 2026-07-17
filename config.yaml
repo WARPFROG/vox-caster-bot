@@ -1,0 +1,39 @@
+# telegram_token is intentionally not stored here: the bot reads it from the
+# TELEGRAM_TOKEN env var (kept in .env next to docker-compose.yml on the host).
+channel_id: "@orkyhut"
+poll_interval: "5m"
+state_path: "state.json"
+wiki_api: "https://wiki.warpfrog.wtf/api.php"
+
+feeds:
+  - url: "https://wiki.warpfrog.wtf/index.php?title=Special:NewPages&feed=rss"
+    type: "new_page"
+    template: |-
+      🔥 <b>Warpopedia</b> — новый перевод
+
+      {{if .PageURL}}<b><a href="{{.PageURL}}">{{html .Title}}</a></b>
+      {{- else}}<b>{{html .Title}}</b>
+      {{- end}}
+      {{- if .Author}}
+      👤 <i>{{html .Author}}</i>
+      {{- end}}
+
+      🏷 #vox #new
+  # feedrecentchanges only supports: hideminor, hidebots, hideanons, hideliu,
+  # hidepatrolled, hidemyself, hidecategorization (hidenewpages/hidelog/
+  # userExpLevel are Special:RecentChanges web-UI params and are ignored by
+  # the API). Page creations and log entries still arrive; the bot filters
+  # them out (only diff links with non-zero oldid are posted).
+  - url: "https://wiki.warpfrog.wtf/api.php?action=feedrecentchanges&feedformat=rss&namespace=0&hidebots=1&hideminor=1&hideanons=1&days=7&limit=50"
+    type: "update"
+    template: |-
+      📣 <b>Warpopedia</b> — обновление перевода
+
+      {{if .PageURL}}<b><a href="{{.PageURL}}">{{html .Title}}</a></b>
+      {{- else}}<b>{{html .Title}}</b>
+      {{- end}}
+      {{- if .Author}}
+      👤 <i>{{html .Author}}</i>
+      {{- end}}
+
+      🏷 #vox #update

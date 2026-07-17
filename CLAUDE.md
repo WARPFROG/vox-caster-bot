@@ -9,9 +9,15 @@ go build ./cmd/vox-caster-bot     # build binary
 go test ./...                      # run all tests
 go test ./internal/bot -run TestPoll_NewItems -v  # run a single test
 go run ./cmd/vox-caster-bot -once  # single poll cycle, then exit (useful for manual testing)
+TELEGRAM_TOKEN=x go run ./cmd/vox-caster-bot -validate  # validate config.yaml, then exit
 ```
 
-CLI flags: `-config <path>` (default `config.yaml`), `-once`. CI runs `go test ./...` on Go 1.23; there is no linter.
+CLI flags: `-config <path>` (default `config.yaml`), `-once`, `-validate`.
+
+**CI/CD** (GitHub Actions, Go from `go-version: stable`):
+- `ci.yml` (PR + main): tests, golangci-lint (`.golangci.yml`), govulncheck, config validation via `-validate`, Docker build check on PRs
+- `deploy.yml` (push to main): tests → build+push `ghcr.io/warpfrog/vox-caster-bot` (`latest` + `main-<sha>` for rollbacks) → SSH deploy to the VPS (scp `docker-compose.yml`+`config.yaml`, `docker compose pull && up -d`, smoke check). Deploy is skipped until `DEPLOY_HOST`/`DEPLOY_USER`/`DEPLOY_SSH_KEY` (+ optional `DEPLOY_PORT`, `DEPLOY_PATH`, default `/opt/vox-caster-bot`) repo secrets are set
+- `release.yml` (`v*` tags): linux/amd64 binary + GitHub release with generated notes + semver-only image tags — `latest` is owned by `deploy.yml` so an old release can't move prod backwards
 
 **Docker:**
 ```bash
@@ -37,6 +43,7 @@ Telegram bot that polls MediaWiki RSS feeds and forwards new/updated pages to a 
 - `update` feeds only post edits to existing pages (`wiki.IsEditURL`: `diff` param + non-zero `oldid`); other items are marked seen without sending. Needed because MediaWiki's `feedrecentchanges` API ignores `hidenewpages`/`hidelog` (those are Special:RecentChanges web-UI params), so page creations arrive in the feed and would be double-posted alongside the `new_page` feed
 - Per-feed custom templates (`feeds[].template`, Go `text/template`) receive `telegram.MessageData` (`.Title`, `.Author`, `.Content`, `.Link`, `.PageURL`, `.FeedTitle`, `.Published`); funcs: `html` (escape), `striphtml`. Execution errors fall back to the built-in template. To expose a new field, thread it through `feed.Item` → `MessageData` → `FormatMessage`
 - All messages sent with `parse_mode=HTML` — user-derived text must be HTML-escaped
+- `config.yaml` is committed and contains no secrets: the token comes only from the `TELEGRAM_TOKEN` env var (`.env` on the host). Deploys ship `config.yaml` to the VPS, so feed/template changes go live via git push
 - Cover images fetched from MediaWiki `pageimages` API; page title extracted from RSS link's `?title=` param. The bot downloads the image bytes and uploads them multipart, so Telegram never needs direct access to the wiki
 - `sendPhoto` with automatic fallback to `sendMessage` if photo delivery fails
 - First run for a feed marks all existing items as seen without sending (prevents spam on startup)
