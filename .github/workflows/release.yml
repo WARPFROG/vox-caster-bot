@@ -67,6 +67,10 @@ jobs:
         with:
           context: .
           push: true
+          # plain manifest: the prod host runs Docker 19.03, which chokes on
+          # provenance/SBOM attestation manifests
+          provenance: false
+          sbom: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
@@ -109,9 +113,11 @@ jobs:
 
       - name: Pull image and restart
         if: steps.gate.outputs.configured == 'true'
+        # the host may only have the standalone docker-compose binary, not the
+        # docker compose plugin — detect which one exists
         run: |
           ssh -i ~/.ssh/deploy_key -p "${DEPLOY_PORT:-22}" "$DEPLOY_USER@$DEPLOY_HOST" \
-            "cd ${DEPLOY_PATH:-/opt/vox-caster-bot} && docker compose pull -q && docker compose up -d"
+            "cd ${DEPLOY_PATH:-/opt/vox-caster-bot} && if docker compose version >/dev/null 2>&1; then C='docker compose'; else C='docker-compose'; fi && \$C pull -q && \$C up -d"
 
       - name: Smoke check
         if: steps.gate.outputs.configured == 'true'
