@@ -14,6 +14,8 @@ TELEGRAM_TOKEN=x go run ./cmd/vox-caster-bot -validate  # validate config.yaml, 
 
 CLI flags: `-config <path>` (default `config.yaml`), `-once`, `-validate`.
 
+**Workflow:** changes land via PRs, squash-merged after review (squash is the only enabled merge method; branches auto-delete). The `protect-main` ruleset blocks force-pushes/deletion and requires green `test`/`lint`/`vulncheck`/`validate-config`/`docker-build` checks; repo admins can bypass it for hotfix pushes straight to main.
+
 **CI/CD** (GitHub Actions, Go from `go-version: stable`):
 - `ci.yml` (PR + main): tests, golangci-lint (`.golangci.yml`), govulncheck, config validation via `-validate`, Docker build check on PRs
 - `release.yml` (`v*` tags) is the only path to prod: tests → linux/amd64 binary + GitHub release with generated notes → `ghcr.io/warpfrog/vox-caster-bot` image (semver + `latest`) → SSH deploy to the VPS (scp `docker-compose.yml`+`config.yaml`, `docker compose pull && up -d`, smoke check). Deploy is skipped until `DEPLOY_HOST`/`DEPLOY_USER`/`DEPLOY_SSH_KEY` (+ optional `DEPLOY_PORT`, `DEPLOY_PATH`, default `/opt/vox-caster-bot`) repo secrets are set. The ghcr package is private — the deploy job logs the host into ghcr with the run's ephemeral `GITHUB_TOKEN` and logs out after pulling. The deployed version is pinned: the deploy writes `BOT_TAG=X.Y.Z` into the host's `.env` and compose uses `image: ...:${BOT_TAG:-latest}`. Roll back by re-running the workflow on an old tag: `gh workflow run release.yml --ref vX.Y.Z`
