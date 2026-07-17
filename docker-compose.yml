@@ -3,6 +3,8 @@ services:
     image: ghcr.io/warpfrog/vox-caster-bot:latest
     container_name: vox-caster-bot
     restart: unless-stopped
+    # host networking so the bot can reach the SOCKS5 proxy on 127.0.0.1
+    network_mode: host
     working_dir: /data
     environment:
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
