@@ -55,9 +55,13 @@ func NewFileStore(path string, maxAge time.Duration) (Store, error) {
 	return s, nil
 }
 
+// HasFeed reports whether the feed has at least one remembered item. A feed
+// whose items have all expired must count as unknown: treating the bare key
+// as "known" would make every current item look new and flood the channel
+// with the feed's entire backlog.
 func (s *fileStore) HasFeed(feedURL string) bool {
-	_, ok := s.data.Feeds[feedURL]
-	return ok
+	fs, ok := s.data.Feeds[feedURL]
+	return ok && len(fs.set) > 0
 }
 
 func (s *fileStore) IsNew(feedURL, itemID string) bool {

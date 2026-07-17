@@ -12,6 +12,12 @@ import (
 	"vox-caster-bot/internal/wiki"
 )
 
+// maxSendsPerPoll caps how many items a single feed may post per poll cycle.
+// Anything beyond the cap stays unseen and goes out on following cycles, so a
+// backlog drains gradually instead of flooding the channel and hitting
+// Telegram rate limits.
+const maxSendsPerPoll = 10
+
 // Bot polls RSS feeds and sends new items to Telegram.
 type Bot struct {
 	Feeds     []config.FeedConfig
@@ -67,6 +73,7 @@ func (b *Bot) processFeed(ctx context.Context, fc config.FeedConfig) error {
 		reversed[len(items)-1-i] = item
 	}
 
+	sent := 0
 	for _, item := range reversed {
 		if !b.State.IsNew(fc.URL, item.GUID) {
 			continue
@@ -75,6 +82,11 @@ func (b *Bot) processFeed(ctx context.Context, fc config.FeedConfig) error {
 		if firstRun {
 			b.State.MarkSeen(fc.URL, item.GUID)
 			continue
+		}
+
+		if sent == maxSendsPerPoll {
+			log.Printf("feed %s: sent %d items this poll, deferring the rest to the next cycle", fc.URL, sent)
+			break
 		}
 
 		// feedrecentchanges ignores hidenewpages/hidelog (those are
@@ -101,6 +113,7 @@ func (b *Bot) processFeed(ctx context.Context, fc config.FeedConfig) error {
 		}
 
 		b.State.MarkSeen(fc.URL, item.GUID)
+		sent++
 
 		if err := b.State.Save(); err != nil {
 			log.Printf("error saving state: %v", err)

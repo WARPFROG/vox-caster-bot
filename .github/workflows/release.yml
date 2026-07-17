@@ -1,12 +1,26 @@
 name: Release
 
+# Prod deploys happen here and only here: pushing a vX.Y.Z tag builds the
+# binary, publishes the GitHub release, pushes the image (semver + latest)
+# and deploys it to the VPS. To roll back, re-run this workflow on an old
+# tag: gh workflow run release.yml --ref vX.Y.Z
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
 
 jobs:
-  docker:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+      - run: go test ./...
+
+  release:
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -14,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version: stable
 
@@ -44,15 +58,83 @@ jobs:
         id: meta
         with:
           images: ghcr.io/warpfrog/vox-caster-bot
-          # latest is owned by the main-branch deploy workflow; releases only
-          # publish immutable semver tags so an old release can't move prod back.
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
 
       - uses: docker/build-push-action@v7
         with:
           context: .
           push: true
+          # plain manifest: the prod host runs Docker 19.03, which chokes on
+          # provenance/SBOM attestation manifests
+          provenance: false
+          sbom: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  deploy:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check deploy secrets
+        id: gate
+        run: |
+          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_USER" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::DEPLOY_HOST/DEPLOY_USER secrets are not set — skipping deploy"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up SSH
+        if: steps.gate.outputs.configured == 'true'
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "${DEPLOY_PORT:-22}" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Ship compose file and config
+        if: steps.gate.outputs.configured == 'true'
+        run: |
+          scp -i ~/.ssh/deploy_key -P "${DEPLOY_PORT:-22}" docker-compose.yml config.yaml \
+            "$DEPLOY_USER@$DEPLOY_HOST:${DEPLOY_PATH:-/opt/vox-caster-bot}/"
+
+      - name: Pull image and restart
+        if: steps.gate.outputs.configured == 'true'
+        # Pins the exact release version by writing BOT_TAG into the host's
+        # .env (compose reads image: ...:${BOT_TAG}); a tag ref deploys that
+        # version, a branch dispatch deploys latest. The ghcr package is
+        # private: log in on the host with the run's ephemeral GITHUB_TOKEN
+        # (fed via stdin, dies with the run) and log out right after. The
+        # host may only have the standalone docker-compose binary, not the
+        # docker compose plugin — detect which.
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then BOT_TAG="${GITHUB_REF_NAME#v}"; else BOT_TAG="latest"; fi
+          echo "deploying image tag: $BOT_TAG"
+          printf '%s' "$GHCR_TOKEN" | ssh -i ~/.ssh/deploy_key -p "${DEPLOY_PORT:-22}" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "docker login ghcr.io -u '$GHCR_USER' --password-stdin && cd ${DEPLOY_PATH:-/opt/vox-caster-bot} && { grep -v '^BOT_TAG=' .env 2>/dev/null; echo 'BOT_TAG=$BOT_TAG'; } > .env.new && mv .env.new .env && if docker compose version >/dev/null 2>&1; then C='docker compose'; else C='docker-compose'; fi && \$C pull -q && \$C up -d; rc=\$?; docker logout ghcr.io >/dev/null 2>&1; exit \$rc"
+
+      - name: Smoke check
+        if: steps.gate.outputs.configured == 'true'
+        run: |
+          sleep 10
+          ssh -i ~/.ssh/deploy_key -p "${DEPLOY_PORT:-22}" "$DEPLOY_USER@$DEPLOY_HOST" \
+            'state=$(docker inspect -f "{{.State.Status}}" vox-caster-bot); echo "container: $state"; docker logs --tail 20 vox-caster-bot; [ "$state" = "running" ]'
