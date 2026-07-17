@@ -36,9 +36,10 @@ TELEGRAM_TOKEN=your_token docker compose up -d
 
 `state.json` is saved in the same directory as `docker-compose.yml` automatically.
 
-Pull the image manually:
+The ghcr package is private; to pull the image manually, log in with a PAT that has `read:packages`:
 
 ```bash
+docker login ghcr.io
 docker pull ghcr.io/warpfrog/vox-caster-bot:latest
 ```
 

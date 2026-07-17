@@ -16,7 +16,7 @@ CLI flags: `-config <path>` (default `config.yaml`), `-once`, `-validate`.
 
 **CI/CD** (GitHub Actions, Go from `go-version: stable`):
 - `ci.yml` (PR + main): tests, golangci-lint (`.golangci.yml`), govulncheck, config validation via `-validate`, Docker build check on PRs
-- `release.yml` (`v*` tags) is the only path to prod: tests → linux/amd64 binary + GitHub release with generated notes → `ghcr.io/warpfrog/vox-caster-bot` image (semver + `latest`) → SSH deploy to the VPS (scp `docker-compose.yml`+`config.yaml`, `docker compose pull && up -d`, smoke check). Deploy is skipped until `DEPLOY_HOST`/`DEPLOY_USER`/`DEPLOY_SSH_KEY` (+ optional `DEPLOY_PORT`, `DEPLOY_PATH`, default `/opt/vox-caster-bot`) repo secrets are set. Roll back by re-running the workflow on an old tag: `gh workflow run release.yml --ref vX.Y.Z`
+- `release.yml` (`v*` tags) is the only path to prod: tests → linux/amd64 binary + GitHub release with generated notes → `ghcr.io/warpfrog/vox-caster-bot` image (semver + `latest`) → SSH deploy to the VPS (scp `docker-compose.yml`+`config.yaml`, `docker compose pull && up -d`, smoke check). Deploy is skipped until `DEPLOY_HOST`/`DEPLOY_USER`/`DEPLOY_SSH_KEY` (+ optional `DEPLOY_PORT`, `DEPLOY_PATH`, default `/opt/vox-caster-bot`) repo secrets are set. The ghcr package is private — the deploy job logs the host into ghcr with the run's ephemeral `GITHUB_TOKEN` and logs out after pulling. Roll back by re-running the workflow on an old tag: `gh workflow run release.yml --ref vX.Y.Z`
 
 **Docker:**
 ```bash
