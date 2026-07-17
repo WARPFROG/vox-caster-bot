@@ -133,8 +133,8 @@ func TestIsEditURL(t *testing.T) {
 		{"https://wiki.example.com/index.php?title=Page&diff=30506&oldid=30494", true},
 		{"https://wiki.example.com/index.php?title=Page&diff=prev&oldid=30494", true},
 		{"https://wiki.example.com/index.php?title=Page&diff=30511&oldid=0", false}, // page creation
-		{"https://wiki.example.com/index.php?title=Page&diff=30511", false},        // no oldid
-		{"https://wiki.example.com/index.php?title=Page", false},                   // log entry / plain page link
+		{"https://wiki.example.com/index.php?title=Page&diff=30511", false},         // no oldid
+		{"https://wiki.example.com/index.php?title=Page", false},                    // log entry / plain page link
 		{"https://wiki.example.com/index.php", false},
 		{"not a url %%%", false},
 	}

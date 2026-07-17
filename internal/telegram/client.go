@@ -97,9 +97,10 @@ func (c *httpClient) sendPhotoUpload(ctx context.Context, channelID string, imag
 	var buf bytes.Buffer
 	w := multipart.NewWriter(&buf)
 
-	w.WriteField("chat_id", channelID)
-	w.WriteField("caption", caption)
-	w.WriteField("parse_mode", "HTML")
+	// Writes into a bytes.Buffer cannot fail, so field errors are ignored.
+	_ = w.WriteField("chat_id", channelID)
+	_ = w.WriteField("caption", caption)
+	_ = w.WriteField("parse_mode", "HTML")
 
 	part, err := w.CreateFormFile("photo", "cover.jpg")
 	if err != nil {
@@ -108,7 +109,9 @@ func (c *httpClient) sendPhotoUpload(ctx context.Context, channelID string, imag
 	if _, err := io.Copy(part, bytes.NewReader(imageData)); err != nil {
 		return fmt.Errorf("write image data: %w", err)
 	}
-	w.Close()
+	if err := w.Close(); err != nil {
+		return fmt.Errorf("finalize multipart body: %w", err)
+	}
 
 	endpoint := fmt.Sprintf("%s/bot%s/sendPhoto", c.apiBase, c.token)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, &buf)
@@ -170,7 +173,7 @@ func FormatNewPage(item feed.Item, pageURL string) string {
 	var b strings.Builder
 	b.WriteString("New page\n\n")
 	if pageURL != "" {
-		b.WriteString(fmt.Sprintf("<b><a href=\"%s\">%s</a></b>\n", escapeHTML(pageURL), escapeHTML(item.Title)))
+		fmt.Fprintf(&b, "<b><a href=\"%s\">%s</a></b>\n", escapeHTML(pageURL), escapeHTML(item.Title))
 	} else {
 		b.WriteString("<b>")
 		b.WriteString(escapeHTML(item.Title))
@@ -189,7 +192,7 @@ func FormatUpdate(item feed.Item, pageURL string) string {
 	var b strings.Builder
 	b.WriteString("Updated\n\n")
 	if pageURL != "" {
-		b.WriteString(fmt.Sprintf("<b><a href=\"%s\">%s</a></b>\n", escapeHTML(pageURL), escapeHTML(item.Title)))
+		fmt.Fprintf(&b, "<b><a href=\"%s\">%s</a></b>\n", escapeHTML(pageURL), escapeHTML(item.Title))
 	} else {
 		b.WriteString("<b>")
 		b.WriteString(escapeHTML(item.Title))
@@ -207,9 +210,9 @@ func FormatUpdate(item feed.Item, pageURL string) string {
 type MessageData struct {
 	Title     string
 	Author    string
-	Content   string    // raw HTML content from the feed item
-	Link      string    // RSS item link (diff link for updates)
-	PageURL   string    // direct page URL
+	Content   string // raw HTML content from the feed item
+	Link      string // RSS item link (diff link for updates)
+	PageURL   string // direct page URL
 	FeedTitle string
 	Published time.Time
 }

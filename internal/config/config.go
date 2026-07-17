@@ -38,7 +38,7 @@ var TemplateFuncs = template.FuncMap{
 }
 
 type FeedConfig struct {
-	URL      string `yaml:"url"`
+	URL      string   `yaml:"url"`
 	Type     FeedType `yaml:"type"`
 	Template string   `yaml:"template"`
 	// Compiled is set by Load() when Template is non-empty.
