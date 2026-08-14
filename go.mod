@@ -3,7 +3,7 @@ module vox-caster-bot
 go 1.25.0
 
 require (
-	github.com/mmcdole/gofeed v1.4.0
+	github.com/mmcdole/gofeed v1.4.1
 	golang.org/x/net v0.57.0
 	gopkg.in/yaml.v3 v3.0.1
 )
