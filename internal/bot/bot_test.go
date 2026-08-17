@@ -29,11 +29,15 @@ func (m *mockFetcher) Fetch(_ context.Context, url string) ([]feed.Item, error) 
 
 type mockState struct {
 	feeds map[string]map[string]bool
+	marks map[string]int
 	saved int
 }
 
 func newMockState() *mockState {
-	return &mockState{feeds: make(map[string]map[string]bool)}
+	return &mockState{
+		feeds: make(map[string]map[string]bool),
+		marks: make(map[string]int),
+	}
 }
 
 func (m *mockState) HasFeed(feedURL string) bool {
@@ -54,6 +58,7 @@ func (m *mockState) MarkSeen(feedURL, itemID string) {
 		m.feeds[feedURL] = make(map[string]bool)
 	}
 	m.feeds[feedURL][itemID] = true
+	m.marks[itemID]++
 }
 
 func (m *mockState) Save() error {
@@ -162,6 +167,41 @@ func TestPoll_AllSeen(t *testing.T) {
 
 	if len(tg.sent) != 0 {
 		t.Errorf("sent %d items, want 0 (all seen)", len(tg.sent))
+	}
+}
+
+func TestPoll_RefreshesItemsStillInFeed(t *testing.T) {
+	// A page sits in Special:NewPages for as long as it stays among the newest
+	// ones — months, in practice. Every poll must re-mark it so its state entry
+	// never expires: an expired entry looks new and floods the channel with the
+	// feed's whole backlog.
+	items := []feed.Item{
+		{GUID: "old", Title: "Still listed", Link: "https://wiki.example.com/index.php?title=Still_listed"},
+	}
+
+	st := newMockState()
+	st.feeds[feedURL()] = map[string]bool{"old": true}
+
+	tg := &mockTelegram{}
+
+	b := &Bot{
+		Feeds:     []config.FeedConfig{{URL: feedURL(), Type: config.FeedNewPage}},
+		ChannelID: "@test",
+		Fetcher:   &mockFetcher{items: map[string][]feed.Item{feedURL(): items}},
+		State:     st,
+		Telegram:  tg,
+	}
+
+	b.Poll(context.Background())
+
+	if len(tg.sent) != 0 {
+		t.Fatalf("sent %d items, want 0 (already seen)", len(tg.sent))
+	}
+	if st.marks["old"] == 0 {
+		t.Error("item still listed in the feed should be re-marked to refresh its timestamp")
+	}
+	if st.saved == 0 {
+		t.Error("state should be saved so refreshed timestamps reach disk")
 	}
 }
 

@@ -185,3 +185,58 @@ func TestMarkSeen_Idempotent(t *testing.T) {
 		t.Errorf("seen list length = %d, want 1 (should be idempotent)", len(fs.Seen))
 	}
 }
+
+func TestMarkSeen_RefreshKeepsLingeringItem(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "state.json")
+
+	s1, err := NewFileStore(path, 24*time.Hour)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	s1.MarkSeen("feed1", "lingering")
+
+	// The item was first seen longer ago than maxAge, but the feed still lists
+	// it, so the bot marks it again. The refreshed timestamp has to survive the
+	// purge and the reload — otherwise the item looks new and gets re-posted.
+	s1.(*fileStore).data.Feeds["feed1"].Seen[0].SeenAt = time.Now().Add(-48 * time.Hour)
+	s1.MarkSeen("feed1", "lingering")
+
+	if err := s1.Save(); err != nil {
+		t.Fatalf("save error: %v", err)
+	}
+
+	s2, err := NewFileStore(path, 24*time.Hour)
+	if err != nil {
+		t.Fatalf("load error: %v", err)
+	}
+
+	if s2.IsNew("feed1", "lingering") {
+		t.Error("refreshed item should still be seen after purge and reload")
+	}
+}
+
+func TestPurge_ReindexesRemainingItems(t *testing.T) {
+	s, err := NewFileStore(filepath.Join(t.TempDir(), "state.json"), 24*time.Hour)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	s.MarkSeen("feed1", "expired")
+	s.MarkSeen("feed1", "kept")
+
+	fs := s.(*fileStore).data.Feeds["feed1"]
+	fs.Seen[0].SeenAt = time.Now().Add(-48 * time.Hour)
+	s.(*fileStore).purge()
+
+	// Dropping "expired" shifts "kept" to index 0. A stale index would refresh
+	// the wrong entry (or run off the end of the slice), leaving "kept" to
+	// expire on the next purge.
+	fs.Seen[0].SeenAt = time.Now().Add(-48 * time.Hour)
+	s.MarkSeen("feed1", "kept")
+	s.(*fileStore).purge()
+
+	if s.IsNew("feed1", "kept") {
+		t.Error("refresh landed on the wrong entry: purge must reindex")
+	}
+}
