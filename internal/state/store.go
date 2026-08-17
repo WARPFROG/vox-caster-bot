@@ -12,6 +12,8 @@ import (
 type Store interface {
 	HasFeed(feedURL string) bool
 	IsNew(feedURL, itemID string) bool
+	// MarkSeen remembers an item, refreshing the timestamp of one that is
+	// already known.
 	MarkSeen(feedURL, itemID string)
 	Save() error
 }
@@ -27,8 +29,8 @@ type storeData struct {
 }
 
 type feedState struct {
-	Seen []seenItem `json:"seen"`
-	set  map[string]struct{}
+	Seen []seenItem     `json:"seen"`
+	idx  map[string]int // item ID -> position in Seen
 }
 
 type seenItem struct {
@@ -37,7 +39,7 @@ type seenItem struct {
 }
 
 // NewFileStore creates a store backed by a JSON file.
-// Items older than maxAge are discarded on load and save.
+// Items not seen for maxAge are discarded on load and save.
 // If the file exists, state is loaded from it.
 func NewFileStore(path string, maxAge time.Duration) (Store, error) {
 	s := &fileStore{
@@ -61,7 +63,7 @@ func NewFileStore(path string, maxAge time.Duration) (Store, error) {
 // with the feed's entire backlog.
 func (s *fileStore) HasFeed(feedURL string) bool {
 	fs, ok := s.data.Feeds[feedURL]
-	return ok && len(fs.set) > 0
+	return ok && len(fs.idx) > 0
 }
 
 func (s *fileStore) IsNew(feedURL, itemID string) bool {
@@ -69,23 +71,28 @@ func (s *fileStore) IsNew(feedURL, itemID string) bool {
 	if !ok {
 		return true
 	}
-	_, seen := fs.set[itemID]
+	_, seen := fs.idx[itemID]
 	return !seen
 }
 
+// MarkSeen records an item as sent, refreshing the timestamp if it is already
+// known. Feeds capped by item count (Special:NewPages) keep entries for months,
+// far longer than maxAge; without the refresh such an item expires out of the
+// state while still listed, looks new again and gets re-posted.
 func (s *fileStore) MarkSeen(feedURL, itemID string) {
 	fs, ok := s.data.Feeds[feedURL]
 	if !ok {
-		fs = &feedState{set: make(map[string]struct{})}
+		fs = &feedState{idx: make(map[string]int)}
 		s.data.Feeds[feedURL] = fs
 	}
 
-	if _, exists := fs.set[itemID]; exists {
+	if i, exists := fs.idx[itemID]; exists {
+		fs.Seen[i].SeenAt = time.Now()
 		return
 	}
 
+	fs.idx[itemID] = len(fs.Seen)
 	fs.Seen = append(fs.Seen, seenItem{ID: itemID, SeenAt: time.Now()})
-	fs.set[itemID] = struct{}{}
 }
 
 func (s *fileStore) Save() error {
@@ -122,17 +129,16 @@ func (s *fileStore) load() error {
 	}
 
 	for _, fs := range s.data.Feeds {
-		fs.set = make(map[string]struct{}, len(fs.Seen))
-		for _, item := range fs.Seen {
-			fs.set[item.ID] = struct{}{}
-		}
+		fs.reindex()
 	}
 
 	s.purge()
 	return nil
 }
 
-// purge removes entries older than maxAge from all feeds.
+// purge drops entries not seen for maxAge from all feeds. Items still listed in
+// a feed are refreshed on every poll, so only ones that dropped out of the feed
+// age out.
 func (s *fileStore) purge() {
 	cutoff := time.Now().Add(-s.maxAge)
 	for _, fs := range s.data.Feeds {
@@ -140,10 +146,17 @@ func (s *fileStore) purge() {
 		for _, item := range fs.Seen {
 			if item.SeenAt.After(cutoff) {
 				kept = append(kept, item)
-			} else {
-				delete(fs.set, item.ID)
 			}
 		}
 		fs.Seen = kept
+		fs.reindex()
+	}
+}
+
+// reindex rebuilds the ID lookup after Seen has been rewritten.
+func (fs *feedState) reindex() {
+	fs.idx = make(map[string]int, len(fs.Seen))
+	for i, item := range fs.Seen {
+		fs.idx[item.ID] = i
 	}
 }

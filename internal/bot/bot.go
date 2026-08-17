@@ -76,6 +76,10 @@ func (b *Bot) processFeed(ctx context.Context, fc config.FeedConfig) error {
 	sent := 0
 	for _, item := range reversed {
 		if !b.State.IsNew(fc.URL, item.GUID) {
+			// Refresh the timestamp: an item has to stay in the state for as
+			// long as the feed lists it, otherwise it expires, looks new again
+			// and gets re-posted.
+			b.State.MarkSeen(fc.URL, item.GUID)
 			continue
 		}
 
@@ -122,9 +126,11 @@ func (b *Bot) processFeed(ctx context.Context, fc config.FeedConfig) error {
 
 	if firstRun {
 		log.Printf("first run for %s: marked %d items as seen", fc.URL, len(items))
-		if err := b.State.Save(); err != nil {
-			log.Printf("error saving state: %v", err)
-		}
+	}
+
+	// Persist the refreshed timestamps of the items still listed in the feed.
+	if err := b.State.Save(); err != nil {
+		log.Printf("error saving state: %v", err)
 	}
 
 	return nil

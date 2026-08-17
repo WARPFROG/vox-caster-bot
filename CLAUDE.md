@@ -48,6 +48,7 @@ Telegram bot that polls MediaWiki RSS feeds and forwards new/updated pages to a 
 - Cover images fetched from MediaWiki `pageimages` API; page title extracted from RSS link's `?title=` param. The bot downloads the image bytes and uploads them multipart, so Telegram never needs direct access to the wiki
 - `sendPhoto` with automatic fallback to `sendMessage` if photo delivery fails
 - First run for a feed marks all existing items as seen without sending (prevents spam on startup). A feed whose remembered items have all expired counts as first-run again — `state.HasFeed` requires a non-empty seen set, otherwise a stale state key would flood the channel with the feed's whole backlog
+- Seen items are re-marked on every poll for as long as the feed lists them (`state.MarkSeen` refreshes the timestamp), so `state_max_age` means "gone from the feed that long", not "first seen that long ago". `Special:NewPages` is capped by item count rather than by age — entries linger there for months, and letting one expire while it is still listed re-posts it (issue #22)
 - At most `maxSendsPerPoll` (10) items are posted per feed per cycle; a longer backlog drains over subsequent cycles instead of hitting Telegram rate limits
 - Items sent oldest-first (feeds reversed) to preserve chronological order
 - On send failure, processing stops for that feed and retries next poll. State saved after each successful send (at-least-once delivery)
