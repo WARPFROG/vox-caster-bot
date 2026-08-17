@@ -27,7 +27,11 @@ feeds:
   # userExpLevel are Special:RecentChanges web-UI params and are ignored by
   # the API). Page creations and log entries still arrive; the bot filters
   # them out (only diff links with non-zero oldid are posted).
-  - url: "https://wiki.warpfrog.wtf/api.php?action=feedrecentchanges&feedformat=rss&namespace=0&hidebots=1&hideminor=1&hideanons=1&days=7&limit=50"
+  # days=30 keeps this window comparable to Special:NewPages, which has no days
+  # param at all and reaches back to the recentchanges retention limit: with a
+  # shorter window a downtime of over a week drops edits for good, while page
+  # creations would still be recovered.
+  - url: "https://wiki.warpfrog.wtf/api.php?action=feedrecentchanges&feedformat=rss&namespace=0&hidebots=1&hideminor=1&hideanons=1&days=30&limit=50"
     type: "update"
     template: |-
       📢 <b>Warpopedia</b> — обновление перевода
